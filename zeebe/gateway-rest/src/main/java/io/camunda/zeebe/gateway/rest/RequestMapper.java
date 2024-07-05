@@ -16,6 +16,7 @@ import io.camunda.zeebe.auth.api.JwtAuthorizationBuilder;
 import io.camunda.zeebe.auth.impl.Authorization;
 import io.camunda.zeebe.gateway.protocol.rest.Changeset;
 import io.camunda.zeebe.gateway.protocol.rest.JobActivationRequest;
+import io.camunda.zeebe.gateway.protocol.rest.JobCompletionRequest;
 import io.camunda.zeebe.gateway.protocol.rest.UserTaskAssignmentRequest;
 import io.camunda.zeebe.gateway.protocol.rest.UserTaskCompletionRequest;
 import io.camunda.zeebe.gateway.protocol.rest.UserTaskUpdateRequest;
@@ -99,8 +100,7 @@ public class RequestMapper {
   public static Either<ProblemDetail, ActivateJobsRequest> toJobsActivationRequest(
       final JobActivationRequest activationRequest) {
 
-    final var validationErrorResponse = validateJobActivationRequest(activationRequest);
-    return validationErrorResponse
+    return validateJobActivationRequest(activationRequest)
         .<Either<ProblemDetail, ActivateJobsRequest>>map(Either::left)
         .orElseGet(
             () ->
@@ -115,6 +115,14 @@ public class RequestMapper {
                             activationRequest, JobActivationRequest::getFetchVariable),
                         getLongOrZero(
                             activationRequest, JobActivationRequest::getRequestTimeout))));
+  }
+
+  public static Either<ProblemDetail, CompleteJobRequest> toJobCompletionRequest(
+      final JobCompletionRequest completionRequest, final long jobKey) {
+
+    return Either.right(
+        new CompleteJobRequest(
+            jobKey, getMapOrEmpty(completionRequest, JobCompletionRequest::getVariables)));
   }
 
   private static Optional<ProblemDetail> validateAssignmentRequest(
@@ -207,7 +215,7 @@ public class RequestMapper {
                     .orElseGet(result));
   }
 
-  public static CompletableFuture<ResponseEntity<Object>> executeServiceMethodWithNoContenResult(
+  public static CompletableFuture<ResponseEntity<Object>> executeServiceMethodWithNoContentResult(
       final Supplier<CompletableFuture<?>> method) {
     return RequestMapper.executeServiceMethod(method, () -> ResponseEntity.noContent().build());
   }
@@ -247,10 +255,9 @@ public class RequestMapper {
     return record;
   }
 
-  private static Map<String, Object> getMapOrEmpty(
-      final UserTaskCompletionRequest request,
-      final Function<UserTaskCompletionRequest, Map<String, Object>> variablesExtractor) {
-    return request == null ? Map.of() : variablesExtractor.apply(request);
+  private static <R> Map<String, Object> getMapOrEmpty(
+      final R request, final Function<R, Map<String, Object>> mapExtractor) {
+    return request == null ? Map.of() : mapExtractor.apply(request);
   }
 
   private static <R> String getStringOrEmpty(
@@ -277,4 +284,6 @@ public class RequestMapper {
 
   public record AssignUserTaskRequest(
       long userTaskKey, String assignee, String action, boolean allowOverride) {}
+
+  public record CompleteJobRequest(long jobKey, Map<String, Object> variables) {}
 }
