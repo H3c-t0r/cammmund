@@ -27,6 +27,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 
@@ -104,9 +106,27 @@ public final class DeploymentTransformer {
       return Either.left(new Failure(rejectionReason));
     }
 
+    // TODO do a first round to check if anything has changed (no full transformation and error
+    // checking?) would need to do that anyway to check deployment-bound links
     while (resourceIterator.hasNext()) {
       final DeploymentResource deploymentResource = resourceIterator.next();
-      success &= transformResource(deploymentEvent, errors, deploymentResource);
+      success &=
+          transformResource(
+              deploymentEvent,
+              errors,
+              deploymentResource,
+              transformer -> transformer::transformResourceStep1);
+    }
+
+    if (success) {
+      for (final DeploymentResource deploymentResource : deploymentEvent.resources()) {
+        success &=
+            transformResource(
+                deploymentEvent,
+                errors,
+                deploymentResource,
+                transformer -> transformer::transformResourceStep2);
+      }
     }
 
     if (!success) {
@@ -124,13 +144,18 @@ public final class DeploymentTransformer {
   private boolean transformResource(
       final DeploymentRecord deploymentEvent,
       final StringBuilder errors,
-      final DeploymentResource deploymentResource) {
+      final DeploymentResource deploymentResource,
+      final Function<
+              DeploymentResourceTransformer,
+              BiFunction<DeploymentResource, DeploymentRecord, Either<Failure, Void>>>
+          transformation) {
     final String resourceName = deploymentResource.getResourceName();
 
     final var transformer = getResourceTransformer(resourceName);
 
     try {
-      final var result = transformer.transformResource(deploymentResource, deploymentEvent);
+      final var result =
+          transformation.apply(transformer).apply(deploymentResource, deploymentEvent);
 
       if (result.isRight()) {
         return true;
@@ -166,9 +191,17 @@ public final class DeploymentTransformer {
   private static final class UnknownResourceTransformer implements DeploymentResourceTransformer {
 
     @Override
-    public Either<Failure, Void> transformResource(
+    public Either<Failure, Void> transformResourceStep1(
         final DeploymentResource resource, final DeploymentRecord deployment) {
 
+      final var failureMessage =
+          String.format("%n'%s': unknown resource type", resource.getResourceName());
+      return Either.left(new Failure(failureMessage));
+    }
+
+    @Override
+    public Either<Failure, Void> transformResourceStep2(
+        final DeploymentResource resource, final DeploymentRecord deployment) {
       final var failureMessage =
           String.format("%n'%s': unknown resource type", resource.getResourceName());
       return Either.left(new Failure(failureMessage));

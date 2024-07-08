@@ -308,7 +308,7 @@ final class JsonSerializableToJsonTest {
                   .setResourceName(wrapString(resourceName))
                   .setVersion(processVersion)
                   .setChecksum(checksum)
-                  .markAsDuplicate();
+                  .setDuplicate(true);
               record
                   .decisionRequirementsMetadata()
                   .add()

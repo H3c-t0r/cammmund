@@ -30,7 +30,7 @@ import io.camunda.zeebe.protocol.record.intent.ProcessIntent;
 import io.camunda.zeebe.stream.api.state.KeyGenerator;
 import io.camunda.zeebe.util.Either;
 import io.camunda.zeebe.util.buffer.BufferUtil;
-import java.util.Collection;
+import java.util.List;
 import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.agrona.io.DirectBufferInputStream;
@@ -67,7 +67,7 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
   }
 
   @Override
-  public Either<Failure, Void> transformResource(
+  public Either<Failure, Void> transformResourceStep1(
       final DeploymentResource resource, final DeploymentRecord deployment) {
 
     return readProcessDefinition(resource)
@@ -95,7 +95,7 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
                         })
                     .map(
                         ok -> {
-                          transformProcessResource(deployment, resource, definition);
+                          createProcessMetadata(deployment, resource, definition);
                           return null;
                         });
 
@@ -104,6 +104,18 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
                     String.format("'%s': %s", resource.getResourceName(), validationError);
                 return Either.left(new Failure(failureMessage));
               }
+            });
+  }
+
+  @Override
+  public Either<Failure, Void> transformResourceStep2(
+      final DeploymentResource resource, final DeploymentRecord deploymentEvent) {
+    // TODO how to avoid reading the definition twice?
+    return readProcessDefinition(resource)
+        .map(
+            definition -> {
+              transformProcessResource(deploymentEvent, resource, definition);
+              return null;
             });
   }
 
@@ -145,54 +157,79 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
         .orElse(Either.right(null));
   }
 
+  private void createProcessMetadata(
+      final DeploymentRecord deploymentEvent,
+      final DeploymentResource deploymentResource,
+      final BpmnModelInstance definition) {
+    for (final Process process : getExecutableProcesses(definition)) {
+      final String bpmnProcessId = process.getId();
+      final String tenantId = deploymentEvent.getTenantId();
+      final DeployedProcess lastProcess =
+          processState.getLatestProcessVersionByProcessId(
+              BufferUtil.wrapString(bpmnProcessId), tenantId);
+
+      final DirectBuffer lastDigest =
+          processState.getLatestVersionDigest(wrapString(bpmnProcessId), tenantId);
+      final DirectBuffer resourceDigest = checksumGenerator.apply(deploymentResource.getResource());
+
+      // adds process record to deployment record
+      final var processMetadata = deploymentEvent.processesMetadata().add();
+      processMetadata
+          .setBpmnProcessId(BufferUtil.wrapString(bpmnProcessId))
+          .setChecksum(resourceDigest)
+          .setResourceName(deploymentResource.getResourceNameBuffer())
+          .setTenantId(tenantId);
+      if (isDuplicateOfLatest(deploymentResource, resourceDigest, lastProcess, lastDigest)) {
+        processMetadata
+            .setVersion(lastProcess.getVersion())
+            .setKey(lastProcess.getKey())
+            .setDuplicate(true);
+      } else {
+        processMetadata
+            .setKey(keyGenerator.nextKey())
+            .setVersion(processState.getNextProcessVersion(bpmnProcessId, tenantId));
+      }
+    }
+  }
+
+  // TODO rename?
   private void transformProcessResource(
       final DeploymentRecord deploymentEvent,
       final DeploymentResource deploymentResource,
       final BpmnModelInstance definition) {
-    final Collection<Process> processes =
-        definition.getDefinitions().getChildElementsByType(Process.class);
-
-    for (final Process process : processes) {
-      if (process.isExecutable()) {
-        final String bpmnProcessId = process.getId();
-        final String tenantId = deploymentEvent.getTenantId();
-        final DeployedProcess lastProcess =
-            processState.getLatestProcessVersionByProcessId(
-                BufferUtil.wrapString(bpmnProcessId), tenantId);
-
-        final DirectBuffer lastDigest =
-            processState.getLatestVersionDigest(wrapString(bpmnProcessId), tenantId);
-        final DirectBuffer resourceDigest =
-            checksumGenerator.apply(deploymentResource.getResource());
-
-        // adds process record to deployment record
-        final var processMetadata = deploymentEvent.processesMetadata().add();
-        processMetadata
-            .setBpmnProcessId(BufferUtil.wrapString(process.getId()))
-            .setChecksum(resourceDigest)
-            .setResourceName(deploymentResource.getResourceNameBuffer())
-            .setTenantId(tenantId);
-
-        final var isDuplicate =
-            isDuplicateOfLatest(deploymentResource, resourceDigest, lastProcess, lastDigest);
-        if (isDuplicate) {
-          processMetadata
-              .setVersion(lastProcess.getVersion())
-              .setKey(lastProcess.getKey())
-              .markAsDuplicate();
-        } else {
-          final var key = keyGenerator.nextKey();
-          processMetadata
-              .setKey(key)
-              .setVersion(processState.getNextProcessVersion(bpmnProcessId, tenantId));
-
-          stateWriter.appendFollowUpEvent(
-              key,
-              ProcessIntent.CREATED,
-              new ProcessRecord().wrap(processMetadata, deploymentResource.getResource()));
-        }
+    // if the deployment contains at least one non-duplicate resource, create new versions for ALL
+    // resources
+    if (deploymentEvent.hasChanged()) {
+      for (final Process process : getExecutableProcesses(definition)) {
+        deploymentEvent.processesMetadata().stream()
+            .filter(metadata -> process.getId().equals(metadata.getBpmnProcessId()))
+            .findFirst()
+            .ifPresent(
+                metadata -> {
+                  var key = metadata.getKey();
+                  if (metadata.isDuplicate()) {
+                    key = keyGenerator.nextKey();
+                    metadata
+                        .setKey(key)
+                        // TODO or just metadata.getVersion() + 1
+                        .setVersion(
+                            processState.getNextProcessVersion(
+                                metadata.getBpmnProcessId(), deploymentEvent.getTenantId()))
+                        .setDuplicate(false);
+                  }
+                  stateWriter.appendFollowUpEvent(
+                      key,
+                      ProcessIntent.CREATED,
+                      new ProcessRecord().wrap(metadata, deploymentResource.getResource()));
+                });
       }
     }
+  }
+
+  private List<Process> getExecutableProcesses(final BpmnModelInstance modelInstance) {
+    return modelInstance.getDefinitions().getChildElementsByType(Process.class).stream()
+        .filter(Process::isExecutable)
+        .toList();
   }
 
   private boolean isDuplicateOfLatest(

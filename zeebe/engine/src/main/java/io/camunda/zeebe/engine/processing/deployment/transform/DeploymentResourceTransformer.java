@@ -14,6 +14,11 @@ import io.camunda.zeebe.util.Either;
 
 interface DeploymentResourceTransformer {
 
+  // TODO name + comment
+  Either<Failure, Void> transformResourceStep1(
+      final DeploymentResource resource, final DeploymentRecord deployment);
+
+  // TODO name + comment
   /**
    * Transform the given resource. As a result, the transformer should add the deployed resource to
    * the deployment record and write an event for the resource (e.g. a process record).
@@ -23,5 +28,6 @@ interface DeploymentResourceTransformer {
    * @return either {@link Either.Right} if the resource is transformed successfully, or {@link
    *     Either.Left} if the transformation failed
    */
-  Either<Failure, Void> transformResource(DeploymentResource resource, DeploymentRecord deployment);
+  Either<Failure, Void> transformResourceStep2(
+      DeploymentResource resource, DeploymentRecord deployment);
 }

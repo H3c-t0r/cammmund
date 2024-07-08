@@ -64,7 +64,7 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
   }
 
   @Override
-  public Either<Failure, Void> transformResource(
+  public Either<Failure, Void> transformResourceStep1(
       final DeploymentResource resource, final DeploymentRecord deployment) {
 
     final var dmnResource = new ByteArrayInputStream(resource.getResource());
@@ -84,6 +84,12 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
           String.format("'%s': %s", resource.getResourceName(), parsedDrg.getFailureMessage());
       return Either.left(new Failure(failure));
     }
+  }
+
+  @Override
+  public Either<Failure, Void> transformResourceStep2(
+      final DeploymentResource resource, final DeploymentRecord deployment) {
+    return Either.right(null); // TODO
   }
 
   private Either<Failure, ?> checkForDuplicateIds(

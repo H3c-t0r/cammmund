@@ -52,7 +52,7 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
   }
 
   @Override
-  public Either<Failure, Void> transformResource(
+  public Either<Failure, Void> transformResourceStep1(
       final DeploymentResource resource, final DeploymentRecord deployment) {
 
     return parseFormId(resource)
@@ -68,6 +68,12 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
 
                           return null;
                         }));
+  }
+
+  @Override
+  public Either<Failure, Void> transformResourceStep2(
+      final DeploymentResource resource, final DeploymentRecord deployment) {
+    return Either.right(null); // TODO
   }
 
   private Either<Failure, String> parseFormId(final DeploymentResource resource) {
