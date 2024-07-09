@@ -319,7 +319,7 @@ final class JsonSerializableToJsonTest {
                   .setNamespace("namespace")
                   .setResourceName("resource-name")
                   .setChecksum(checksum)
-                  .markAsDuplicate();
+                  .setDuplicate(true);
               record
                   .decisionsMetadata()
                   .add()
@@ -329,7 +329,7 @@ final class JsonSerializableToJsonTest {
                   .setDecisionKey(2L)
                   .setDecisionRequirementsKey(1L)
                   .setDecisionRequirementsId("drg-id")
-                  .markAsDuplicate();
+                  .setDuplicate(true);
               record
                   .formMetadata()
                   .add()
