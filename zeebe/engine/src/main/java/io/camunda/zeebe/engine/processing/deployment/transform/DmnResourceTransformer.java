@@ -275,58 +275,65 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
       final DeploymentRecord deployment,
       final DeploymentResource resource,
       final ParsedDecisionRequirementsGraph parsedDrg) {
-    if (deployment.hasChanged()) {
-      deployment.decisionRequirementsMetadata().stream()
-          .filter(drg -> drg.getDecisionRequirementsId().equals(parsedDrg.getId()))
-          .findFirst()
-          .ifPresent(
-              drg -> {
-                var key = drg.getDecisionRequirementsKey();
-                if (drg.isDuplicate()) {
-                  key = keyGenerator.nextKey();
-                  drg.setDecisionRequirementsKey(key)
-                      // TODO simply +1 or get latest from state again?
-                      .setDecisionRequirementsVersion(drg.getDecisionRequirementsVersion() + 1)
-                      .setDuplicate(false);
-                }
-                stateWriter.appendFollowUpEvent(
-                    key,
-                    DecisionRequirementsIntent.CREATED,
-                    new DecisionRequirementsRecord()
-                        .setDecisionRequirementsKey(key)
-                        .setDecisionRequirementsId(drg.getDecisionRequirementsId())
-                        .setDecisionRequirementsName(drg.getDecisionRequirementsName())
-                        .setDecisionRequirementsVersion(drg.getDecisionRequirementsVersion())
-                        .setNamespace(drg.getNamespace())
-                        .setResourceName(drg.getResourceName())
-                        .setChecksum(drg.getChecksumBuffer())
-                        .setResource(resource.getResourceBuffer())
-                        .setTenantId(drg.getTenantId()));
-              });
-      deployment.decisionsMetadata().stream()
-          .filter(decision -> decision.getDecisionRequirementsId().equals(parsedDrg.getId()))
-          .forEach(
-              decision -> {
-                var key = decision.getDecisionKey();
-                if (decision.isDuplicate()) {
-                  key = keyGenerator.nextKey();
-                  decision
-                      .setDecisionKey(key)
-                      .setVersion(decision.getVersion() + 1) // TODO
-                      .setDuplicate(false);
-                }
-                stateWriter.appendFollowUpEvent(
-                    key,
-                    DecisionIntent.CREATED,
-                    new DecisionRecord()
-                        .setDecisionKey(key)
-                        .setDecisionId(decision.getDecisionId())
-                        .setDecisionName(decision.getDecisionName())
-                        .setVersion(decision.getVersion())
-                        .setDecisionRequirementsId(decision.getDecisionRequirementsId())
-                        .setDecisionRequirementsKey(decision.getDecisionRequirementsKey())
-                        .setTenantId(decision.getTenantId()));
-              });
+    if (!deployment.hasChanged()) {
+      return;
     }
+    deployment.decisionRequirementsMetadata().stream()
+        .filter(drg -> drg.getDecisionRequirementsId().equals(parsedDrg.getId()))
+        .findFirst()
+        .ifPresent(
+            drg -> {
+              var drgKey = drg.getDecisionRequirementsKey();
+              if (drg.isDuplicate()) {
+                drgKey = keyGenerator.nextKey();
+                drg.setDecisionRequirementsKey(drgKey)
+                    // TODO simply +1 or get latest from state again?
+                    .setDecisionRequirementsVersion(drg.getDecisionRequirementsVersion() + 1)
+                    .setDuplicate(false);
+              }
+              stateWriter.appendFollowUpEvent(
+                  drgKey,
+                  DecisionRequirementsIntent.CREATED,
+                  new DecisionRequirementsRecord()
+                      .setDecisionRequirementsKey(drgKey)
+                      .setDecisionRequirementsId(drg.getDecisionRequirementsId())
+                      .setDecisionRequirementsName(drg.getDecisionRequirementsName())
+                      .setDecisionRequirementsVersion(drg.getDecisionRequirementsVersion())
+                      .setNamespace(drg.getNamespace())
+                      .setResourceName(drg.getResourceName())
+                      .setChecksum(drg.getChecksumBuffer())
+                      .setResource(resource.getResourceBuffer())
+                      .setTenantId(drg.getTenantId()));
+
+              deployment.decisionsMetadata().stream()
+                  .filter(
+                      decision ->
+                          decision
+                              .getDecisionRequirementsId()
+                              .equals(drg.getDecisionRequirementsId()))
+                  .forEach(
+                      decision -> {
+                        var decisionKey = decision.getDecisionKey();
+                        if (decision.isDuplicate()) {
+                          decisionKey = keyGenerator.nextKey();
+                          decision
+                              .setDecisionKey(decisionKey)
+                              .setDecisionRequirementsKey(drg.getDecisionRequirementsKey())
+                              .setVersion(decision.getVersion() + 1) // TODO
+                              .setDuplicate(false);
+                        }
+                        stateWriter.appendFollowUpEvent(
+                            decisionKey,
+                            DecisionIntent.CREATED,
+                            new DecisionRecord()
+                                .setDecisionKey(decisionKey)
+                                .setDecisionId(decision.getDecisionId())
+                                .setDecisionName(decision.getDecisionName())
+                                .setVersion(decision.getVersion())
+                                .setDecisionRequirementsId(decision.getDecisionRequirementsId())
+                                .setDecisionRequirementsKey(decision.getDecisionRequirementsKey())
+                                .setTenantId(decision.getTenantId()));
+                      });
+            });
   }
 }
