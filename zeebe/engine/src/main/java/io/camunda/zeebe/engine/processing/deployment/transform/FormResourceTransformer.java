@@ -30,9 +30,6 @@ import org.agrona.DirectBuffer;
 public final class FormResourceTransformer implements DeploymentResourceTransformer {
 
   private static final int INITIAL_VERSION = 1;
-
-  private static final Either<Failure, Object> NO_DUPLICATES = Either.right(null);
-
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   private final KeyGenerator keyGenerator;
@@ -72,24 +69,25 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
   public Either<Failure, Void> transformResourceStep2(
       final DeploymentResource resource, final DeploymentRecord deployment) {
     // TODO find resource by checksum or parse form again?
-    if (deployment.hasChanged()) {
-      final var checksum = checksumGenerator.apply(resource.getResource());
-      deployment.formMetadata().stream()
-          .filter(metadata -> checksum.equals(metadata.getChecksumBuffer()))
-          .findFirst()
-          .ifPresent(
-              metadata -> {
-                var key = metadata.getFormKey();
-                if (metadata.isDuplicate()) {
-                  key = keyGenerator.nextKey();
-                  metadata
-                      .setFormKey(key)
-                      .setVersion(metadata.getVersion() + 1) // TODO
-                      .setDuplicate(false);
-                }
-                writeFormRecord(metadata, resource);
-              });
+    if (!deployment.hasChanged()) {
+      return Either.right(null);
     }
+    final var checksum = checksumGenerator.apply(resource.getResource());
+    deployment.formMetadata().stream()
+        .filter(metadata -> checksum.equals(metadata.getChecksumBuffer()))
+        .findFirst()
+        .ifPresent(
+            metadata -> {
+              var key = metadata.getFormKey();
+              if (metadata.isDuplicate()) {
+                key = keyGenerator.nextKey();
+                metadata
+                    .setFormKey(key)
+                    .setVersion(metadata.getVersion() + 1) // TODO
+                    .setDuplicate(false);
+              }
+              writeFormRecord(metadata, resource);
+            });
     return Either.right(null);
   }
 
