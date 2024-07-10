@@ -199,30 +199,31 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
       final BpmnModelInstance definition) {
     // if the deployment contains at least one non-duplicate resource, create new versions for ALL
     // resources
-    if (deploymentEvent.hasChanged()) {
-      for (final Process process : getExecutableProcesses(definition)) {
-        deploymentEvent.processesMetadata().stream()
-            .filter(metadata -> process.getId().equals(metadata.getBpmnProcessId()))
-            .findFirst()
-            .ifPresent(
-                metadata -> {
-                  var key = metadata.getKey();
-                  if (metadata.isDuplicate()) {
-                    key = keyGenerator.nextKey();
-                    metadata
-                        .setKey(key)
-                        // TODO or just metadata.getVersion() + 1
-                        .setVersion(
-                            processState.getNextProcessVersion(
-                                metadata.getBpmnProcessId(), deploymentEvent.getTenantId()))
-                        .setDuplicate(false);
-                  }
-                  stateWriter.appendFollowUpEvent(
-                      key,
-                      ProcessIntent.CREATED,
-                      new ProcessRecord().wrap(metadata, deploymentResource.getResource()));
-                });
-      }
+    if (!deploymentEvent.hasChanged()) {
+      return;
+    }
+    for (final Process process : getExecutableProcesses(definition)) {
+      deploymentEvent.processesMetadata().stream()
+          .filter(metadata -> process.getId().equals(metadata.getBpmnProcessId()))
+          .findFirst()
+          .ifPresent(
+              metadata -> {
+                var key = metadata.getKey();
+                if (metadata.isDuplicate()) {
+                  key = keyGenerator.nextKey();
+                  metadata
+                      .setKey(key)
+                      // TODO or just metadata.getVersion() + 1
+                      .setVersion(
+                          processState.getNextProcessVersion(
+                              metadata.getBpmnProcessId(), deploymentEvent.getTenantId()))
+                      .setDuplicate(false);
+                }
+                stateWriter.appendFollowUpEvent(
+                    key,
+                    ProcessIntent.CREATED,
+                    new ProcessRecord().wrap(metadata, deploymentResource.getResource()));
+              });
     }
   }
 
