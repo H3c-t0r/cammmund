@@ -64,8 +64,6 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
                           final FormMetadataRecord formRecord = deployment.formMetadata().add();
                           appendMetadataToFormRecord(
                               formRecord, formId, resource, deployment.getTenantId());
-                          writeFormRecord(formRecord, resource);
-
                           return null;
                         }));
   }
@@ -73,7 +71,26 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
   @Override
   public Either<Failure, Void> transformResourceStep2(
       final DeploymentResource resource, final DeploymentRecord deployment) {
-    return Either.right(null); // TODO
+    // TODO find resource by checksum or parse form again?
+    if (deployment.hasChanged()) {
+      final var checksum = checksumGenerator.apply(resource.getResource());
+      deployment.formMetadata().stream()
+          .filter(metadata -> checksum.equals(metadata.getChecksumBuffer()))
+          .findFirst()
+          .ifPresent(
+              metadata -> {
+                var key = metadata.getFormKey();
+                if (metadata.isDuplicate()) {
+                  key = keyGenerator.nextKey();
+                  metadata
+                      .setFormKey(key)
+                      .setVersion(metadata.getVersion() + 1) // TODO
+                      .setDuplicate(false);
+                }
+                writeFormRecord(metadata, resource);
+              });
+    }
+    return Either.right(null);
   }
 
   private Either<Failure, String> parseFormId(final DeploymentResource resource) {
@@ -137,7 +154,7 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
                 formRecord
                     .setFormKey(latestForm.getFormKey())
                     .setVersion(latestVersion)
-                    .markAsDuplicate();
+                    .setDuplicate(true);
               } else {
                 formRecord
                     .setFormKey(newFormKey.getAsLong())
@@ -149,12 +166,10 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
 
   private void writeFormRecord(
       final FormMetadataRecord formRecord, final DeploymentResource resource) {
-    if (!formRecord.isDuplicate()) {
-      stateWriter.appendFollowUpEvent(
-          formRecord.getFormKey(),
-          FormIntent.CREATED,
-          new FormRecord().wrap(formRecord, resource.getResource()));
-    }
+    stateWriter.appendFollowUpEvent(
+        formRecord.getFormKey(),
+        FormIntent.CREATED,
+        new FormRecord().wrap(formRecord, resource.getResource()));
   }
 
   private Either<Failure, String> validateFormId(final String formId) {

@@ -338,7 +338,7 @@ final class JsonSerializableToJsonTest {
                   .setFormKey(1L)
                   .setResourceName("form1.form")
                   .setChecksum(checksum)
-                  .markAsDuplicate();
+                  .setDuplicate(true);
               return record;
             },
         """
