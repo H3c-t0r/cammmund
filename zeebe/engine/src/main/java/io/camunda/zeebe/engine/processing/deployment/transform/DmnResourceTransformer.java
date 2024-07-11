@@ -86,13 +86,8 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
   @Override
   public Either<Failure, Void> transformResourceStep2(
       final DeploymentResource resource, final DeploymentRecord deployment) {
-
-    // TODO how to avoid reading the resource twice?
-    final var dmnResource = new ByteArrayInputStream(resource.getResource());
-    final var parsedDrg = decisionEngine.parse(dmnResource);
-
-    writeRecords(deployment, resource, parsedDrg);
-    return Either.right(null); // TODO
+    writeRecords(deployment, resource);
+    return Either.right(null);
   }
 
   private Either<Failure, ?> checkForDuplicateIds(
@@ -271,15 +266,13 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
         .allMatch(drgKey -> drgKey == drg.getDecisionRequirementsKey());
   }
 
-  private void writeRecords(
-      final DeploymentRecord deployment,
-      final DeploymentResource resource,
-      final ParsedDecisionRequirementsGraph parsedDrg) {
+  private void writeRecords(final DeploymentRecord deployment, final DeploymentResource resource) {
     if (deployment.hasDuplicatesOnly()) {
       return;
     }
+    final var checksum = checksumGenerator.apply(resource.getResource());
     deployment.decisionRequirementsMetadata().stream()
-        .filter(drg -> drg.getDecisionRequirementsId().equals(parsedDrg.getId()))
+        .filter(drg -> checksum.equals(drg.getChecksumBuffer()))
         .findFirst()
         .ifPresent(
             drg -> {
