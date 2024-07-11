@@ -109,14 +109,34 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
 
   @Override
   public Either<Failure, Void> transformResourceStep2(
-      final DeploymentResource resource, final DeploymentRecord deploymentEvent) {
-    // TODO how to avoid reading the definition twice?
-    return readProcessDefinition(resource)
-        .map(
-            definition -> {
-              transformProcessResource(deploymentEvent, resource, definition);
-              return null;
+      final DeploymentResource resource, final DeploymentRecord deployment) {
+    // if the deployment contains at least one non-duplicate resource, create new versions for ALL
+    // resources
+    if (deployment.hasDuplicatesOnly()) {
+      return Either.right(null);
+    }
+    final var checksum = checksumGenerator.apply(resource.getResource());
+    deployment.processesMetadata().stream()
+        .filter(metadata -> checksum.equals(metadata.getChecksumBuffer()))
+        .forEach(
+            metadata -> {
+              var key = metadata.getKey();
+              if (metadata.isDuplicate()) {
+                key = keyGenerator.nextKey();
+                metadata
+                    .setKey(key)
+                    // TODO or just metadata.getVersion() + 1
+                    .setVersion(
+                        processState.getNextProcessVersion(
+                            metadata.getBpmnProcessId(), deployment.getTenantId()))
+                    .setDuplicate(false);
+              }
+              stateWriter.appendFollowUpEvent(
+                  key,
+                  ProcessIntent.CREATED,
+                  new ProcessRecord().wrap(metadata, resource.getResource()));
             });
+    return Either.right(null);
   }
 
   private Either<Failure, BpmnModelInstance> readProcessDefinition(
@@ -189,41 +209,6 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
             .setKey(keyGenerator.nextKey())
             .setVersion(processState.getNextProcessVersion(bpmnProcessId, tenantId));
       }
-    }
-  }
-
-  // TODO rename?
-  private void transformProcessResource(
-      final DeploymentRecord deploymentEvent,
-      final DeploymentResource deploymentResource,
-      final BpmnModelInstance definition) {
-    // if the deployment contains at least one non-duplicate resource, create new versions for ALL
-    // resources
-    if (deploymentEvent.hasDuplicatesOnly()) {
-      return;
-    }
-    for (final Process process : getExecutableProcesses(definition)) {
-      deploymentEvent.processesMetadata().stream()
-          .filter(metadata -> process.getId().equals(metadata.getBpmnProcessId()))
-          .findFirst()
-          .ifPresent(
-              metadata -> {
-                var key = metadata.getKey();
-                if (metadata.isDuplicate()) {
-                  key = keyGenerator.nextKey();
-                  metadata
-                      .setKey(key)
-                      // TODO or just metadata.getVersion() + 1
-                      .setVersion(
-                          processState.getNextProcessVersion(
-                              metadata.getBpmnProcessId(), deploymentEvent.getTenantId()))
-                      .setDuplicate(false);
-                }
-                stateWriter.appendFollowUpEvent(
-                    key,
-                    ProcessIntent.CREATED,
-                    new ProcessRecord().wrap(metadata, deploymentResource.getResource()));
-              });
     }
   }
 
