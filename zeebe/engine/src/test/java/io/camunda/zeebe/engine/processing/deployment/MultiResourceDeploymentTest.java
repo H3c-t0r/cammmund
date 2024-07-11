@@ -21,6 +21,7 @@ import io.camunda.zeebe.protocol.record.value.deployment.DecisionRequirementsMet
 import io.camunda.zeebe.protocol.record.value.deployment.FormMetadataValue;
 import io.camunda.zeebe.protocol.record.value.deployment.ProcessMetadataValue;
 import io.camunda.zeebe.test.util.record.RecordingExporter;
+import java.util.function.Consumer;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.Rule;
 import org.junit.Test;
@@ -69,27 +70,31 @@ public class MultiResourceDeploymentTest {
     final var processesMetadata = secondDeployment.getProcessesMetadata();
     assertThat(processesMetadata).hasSize(1);
     final var processV2 = processesMetadata.getFirst();
-    assertOnProcessMetadata(processV2, processV1);
+    assertThat(processV2).satisfies(expectedProcessMetadata(processV1.getProcessDefinitionKey()));
 
     final var decisionRequirementsMetadata = secondDeployment.getDecisionRequirementsMetadata();
     assertThat(decisionRequirementsMetadata).hasSize(1);
     final var drgV2 = decisionRequirementsMetadata.getFirst();
-    assertOnDecisionRequirementsMetadata(drgV2, drgV1);
+    assertThat(drgV2)
+        .satisfies(expectedDecisionRequirementsMetadata(drgV1.getDecisionRequirementsKey()));
 
     final var decisionsMetadata = secondDeployment.getDecisionsMetadata();
     assertThat(decisionsMetadata).hasSize(1);
     final var decisionV2 = decisionsMetadata.getFirst();
-    assertOnDecisionMetadata(decisionV2, drgV2, decisionV1);
+    assertThat(decisionV2)
+        .satisfies(
+            expectedDecisionMetadata(
+                drgV2.getDecisionRequirementsKey(), decisionV1.getDecisionKey()));
 
     final var formMetadata = secondDeployment.getFormMetadata();
     assertThat(formMetadata).hasSize(1);
     final var formV2 = formMetadata.getFirst();
-    assertOnFormMetadata(formV2, formV1);
+    assertThat(formV2).satisfies(expectedFormMetadata(formV1.getFormKey()));
 
-    assertOnProcessRecords(processV2);
-    assertOnDecisionRequirementsRecords(drgV2);
-    assertOnDecisionRecords(decisionV2, drgV2);
-    assertOnFormRecords(formV2);
+    assertNewProcessCreatedRecord(processV2.getProcessDefinitionKey());
+    assertNewDecisionRequirementsCreatedRecord(drgV2.getDecisionRequirementsKey());
+    assertNewDecisionCreatedRecord(decisionV2.getDecisionKey(), drgV2.getDecisionRequirementsKey());
+    assertNewFormCreatedRecord(formV2.getFormKey());
   }
 
   @Test // TODO name / DMN has changed
@@ -123,27 +128,31 @@ public class MultiResourceDeploymentTest {
     final var processesMetadata = secondDeployment.getProcessesMetadata();
     assertThat(processesMetadata).hasSize(1);
     final var processV2 = processesMetadata.getFirst();
-    assertOnProcessMetadata(processV2, processV1);
+    assertThat(processV2).satisfies(expectedProcessMetadata(processV1.getProcessDefinitionKey()));
 
     final var decisionRequirementsMetadata = secondDeployment.getDecisionRequirementsMetadata();
     assertThat(decisionRequirementsMetadata).hasSize(1);
     final var drgV2 = decisionRequirementsMetadata.getFirst();
-    assertOnDecisionRequirementsMetadata(drgV2, drgV1);
+    assertThat(drgV2)
+        .satisfies(expectedDecisionRequirementsMetadata(drgV1.getDecisionRequirementsKey()));
 
     final var decisionsMetadata = secondDeployment.getDecisionsMetadata();
     assertThat(decisionsMetadata).hasSize(1);
     final var decisionV2 = decisionsMetadata.getFirst();
-    assertOnDecisionMetadata(decisionV2, drgV2, decisionV1);
+    assertThat(decisionV2)
+        .satisfies(
+            expectedDecisionMetadata(
+                drgV2.getDecisionRequirementsKey(), decisionV1.getDecisionKey()));
 
     final var formMetadata = secondDeployment.getFormMetadata();
     assertThat(formMetadata).hasSize(1);
     final var formV2 = formMetadata.getFirst();
-    assertOnFormMetadata(formV2, formV1);
+    assertThat(formV2).satisfies(expectedFormMetadata(formV1.getFormKey()));
 
-    assertOnProcessRecords(processV2);
-    assertOnDecisionRequirementsRecords(drgV2);
-    assertOnDecisionRecords(decisionV2, drgV2);
-    assertOnFormRecords(formV2);
+    assertNewProcessCreatedRecord(processV2.getProcessDefinitionKey());
+    assertNewDecisionRequirementsCreatedRecord(drgV2.getDecisionRequirementsKey());
+    assertNewDecisionCreatedRecord(decisionV2.getDecisionKey(), drgV2.getDecisionRequirementsKey());
+    assertNewFormCreatedRecord(formV2.getFormKey());
   }
 
   @Test // TODO name / FORM has changed
@@ -177,30 +186,34 @@ public class MultiResourceDeploymentTest {
     final var processesMetadata = secondDeployment.getProcessesMetadata();
     assertThat(processesMetadata).hasSize(1);
     final var processV2 = processesMetadata.getFirst();
-    assertOnProcessMetadata(processV2, processV1);
+    assertThat(processV2).satisfies(expectedProcessMetadata(processV1.getProcessDefinitionKey()));
 
     final var decisionRequirementsMetadata = secondDeployment.getDecisionRequirementsMetadata();
     assertThat(decisionRequirementsMetadata).hasSize(1);
     final var drgV2 = decisionRequirementsMetadata.getFirst();
-    assertOnDecisionRequirementsMetadata(drgV2, drgV1);
+    assertThat(drgV2)
+        .satisfies(expectedDecisionRequirementsMetadata(drgV1.getDecisionRequirementsKey()));
 
     final var decisionsMetadata = secondDeployment.getDecisionsMetadata();
     assertThat(decisionsMetadata).hasSize(1);
     final var decisionV2 = decisionsMetadata.getFirst();
-    assertOnDecisionMetadata(decisionV2, drgV2, decisionV1);
+    assertThat(decisionV2)
+        .satisfies(
+            expectedDecisionMetadata(
+                drgV2.getDecisionRequirementsKey(), decisionV1.getDecisionKey()));
 
     final var formMetadata = secondDeployment.getFormMetadata();
     assertThat(formMetadata).hasSize(1);
     final var formV2 = formMetadata.getFirst();
-    assertOnFormMetadata(formV2, formV1);
+    assertThat(formV2).satisfies(expectedFormMetadata(formV1.getFormKey()));
 
-    assertOnProcessRecords(processV2);
-    assertOnDecisionRequirementsRecords(drgV2);
-    assertOnDecisionRecords(decisionV2, drgV2);
-    assertOnFormRecords(formV2);
+    assertNewProcessCreatedRecord(processV2.getProcessDefinitionKey());
+    assertNewDecisionRequirementsCreatedRecord(drgV2.getDecisionRequirementsKey());
+    assertNewDecisionCreatedRecord(decisionV2.getDecisionKey(), drgV2.getDecisionRequirementsKey());
+    assertNewFormCreatedRecord(formV2.getFormKey());
   }
 
-  @Test // TODO name
+  @Test
   public void shouldNotCreateNewVersionsIfNoResourceHasChanged() {
     // given
     final var process = Bpmn.createExecutableProcess("process").startEvent().endEvent().done();
@@ -286,62 +299,63 @@ public class MultiResourceDeploymentTest {
     assertThat(RecordingExporter.formRecords().withIntent(FormIntent.CREATED).limit(2)).hasSize(1);
   }
 
-  private static void assertOnProcessMetadata(
-      final ProcessMetadataValue processV2, final ProcessMetadataValue processV1) {
-    Assertions.assertThat(processV2)
-        .hasVersion(2)
-        .isNotDuplicate()
-        .extracting(ProcessMetadataValue::getProcessDefinitionKey, InstanceOfAssertFactories.LONG)
-        .isGreaterThan(processV1.getProcessDefinitionKey());
+  private static Consumer<ProcessMetadataValue> expectedProcessMetadata(
+      final long previousProcessDefinitionKey) {
+    return process ->
+        Assertions.assertThat(process)
+            .hasVersion(2)
+            .isNotDuplicate()
+            .extracting(
+                ProcessMetadataValue::getProcessDefinitionKey, InstanceOfAssertFactories.LONG)
+            .isGreaterThan(previousProcessDefinitionKey);
   }
 
-  private static void assertOnDecisionRequirementsMetadata(
-      final DecisionRequirementsMetadataValue drgV2,
-      final DecisionRequirementsMetadataValue drgV1) {
-    Assertions.assertThat(drgV2)
-        .hasDecisionRequirementsVersion(2)
-        .isNotDuplicate()
-        .extracting(
-            DecisionRequirementsMetadataValue::getDecisionRequirementsKey,
-            InstanceOfAssertFactories.LONG)
-        .isGreaterThan(drgV1.getDecisionRequirementsKey());
+  private static Consumer<DecisionRequirementsMetadataValue> expectedDecisionRequirementsMetadata(
+      final long previousDecisionRequirementsKey) {
+    return drg ->
+        Assertions.assertThat(drg)
+            .hasDecisionRequirementsVersion(2)
+            .isNotDuplicate()
+            .extracting(
+                DecisionRequirementsMetadataValue::getDecisionRequirementsKey,
+                InstanceOfAssertFactories.LONG)
+            .isGreaterThan(previousDecisionRequirementsKey);
   }
 
-  private static void assertOnDecisionMetadata(
-      final DecisionRecordValue decisionV2,
-      final DecisionRequirementsMetadataValue drgV2,
-      final DecisionRecordValue decisionV1) {
-    Assertions.assertThat(decisionV2)
-        .hasVersion(2)
-        .hasDecisionRequirementsKey(drgV2.getDecisionRequirementsKey())
-        .isNotDuplicate()
-        .extracting(DecisionRecordValue::getDecisionKey, InstanceOfAssertFactories.LONG)
-        .isGreaterThan(decisionV1.getDecisionKey());
+  private static Consumer<DecisionRecordValue> expectedDecisionMetadata(
+      final long expectedDecisionRequirementsKey, final long previousDecisionKey) {
+    return decision ->
+        Assertions.assertThat(decision)
+            .hasVersion(2)
+            .hasDecisionRequirementsKey(expectedDecisionRequirementsKey)
+            .isNotDuplicate()
+            .extracting(DecisionRecordValue::getDecisionKey, InstanceOfAssertFactories.LONG)
+            .isGreaterThan(previousDecisionKey);
   }
 
-  private static void assertOnFormMetadata(
-      final FormMetadataValue formV2, final FormMetadataValue formV1) {
-    Assertions.assertThat(formV2)
-        .hasVersion(2)
-        .isNotDuplicate()
-        .extracting(FormMetadataValue::getFormKey, InstanceOfAssertFactories.LONG)
-        .isGreaterThan(formV1.getFormKey());
+  private static Consumer<FormMetadataValue> expectedFormMetadata(final long previousFormKey) {
+    return form ->
+        Assertions.assertThat(form)
+            .hasVersion(2)
+            .isNotDuplicate()
+            .extracting(FormMetadataValue::getFormKey, InstanceOfAssertFactories.LONG)
+            .isGreaterThan(previousFormKey);
   }
 
-  private static void assertOnProcessRecords(final ProcessMetadataValue processV2) {
+  private static void assertNewProcessCreatedRecord(final long expectedProcessDefinitionKey) {
     assertThat(
             RecordingExporter.processRecords().withIntent(ProcessIntent.CREATED).limit(2).getLast())
         .satisfies(
             record -> {
-              assertThat(record.getKey()).isEqualTo(processV2.getProcessDefinitionKey());
+              assertThat(record.getKey()).isEqualTo(expectedProcessDefinitionKey);
               assertThat(record.getValue().getProcessDefinitionKey())
-                  .isEqualTo(processV2.getProcessDefinitionKey());
+                  .isEqualTo(expectedProcessDefinitionKey);
               assertThat(record.getValue().getVersion()).isEqualTo(2);
             });
   }
 
-  private static void assertOnDecisionRequirementsRecords(
-      final DecisionRequirementsMetadataValue drgV2) {
+  private static void assertNewDecisionRequirementsCreatedRecord(
+      final long expectedDecisionRequirementsKey) {
     assertThat(
             RecordingExporter.decisionRequirementsRecords()
                 .withIntent(DecisionRequirementsIntent.CREATED)
@@ -349,15 +363,15 @@ public class MultiResourceDeploymentTest {
                 .getLast())
         .satisfies(
             record -> {
-              assertThat(record.getKey()).isEqualTo(drgV2.getDecisionRequirementsKey());
+              assertThat(record.getKey()).isEqualTo(expectedDecisionRequirementsKey);
               assertThat(record.getValue().getDecisionRequirementsKey())
-                  .isEqualTo(drgV2.getDecisionRequirementsKey());
+                  .isEqualTo(expectedDecisionRequirementsKey);
               assertThat(record.getValue().getDecisionRequirementsVersion()).isEqualTo(2);
             });
   }
 
-  private static void assertOnDecisionRecords(
-      final DecisionRecordValue decisionV2, final DecisionRequirementsMetadataValue drgV2) {
+  private static void assertNewDecisionCreatedRecord(
+      final long expectedDecisionKey, final long expectedDecisionRequirementsKey) {
     assertThat(
             RecordingExporter.decisionRecords()
                 .withIntent(DecisionIntent.CREATED)
@@ -365,20 +379,20 @@ public class MultiResourceDeploymentTest {
                 .getLast())
         .satisfies(
             record -> {
-              assertThat(record.getKey()).isEqualTo(decisionV2.getDecisionKey());
-              assertThat(record.getValue().getDecisionKey()).isEqualTo(decisionV2.getDecisionKey());
+              assertThat(record.getKey()).isEqualTo(expectedDecisionKey);
+              assertThat(record.getValue().getDecisionKey()).isEqualTo(expectedDecisionKey);
               assertThat(record.getValue().getDecisionRequirementsKey())
-                  .isEqualTo(drgV2.getDecisionRequirementsKey());
+                  .isEqualTo(expectedDecisionRequirementsKey);
               assertThat(record.getValue().getVersion()).isEqualTo(2);
             });
   }
 
-  private static void assertOnFormRecords(final FormMetadataValue formV2) {
+  private static void assertNewFormCreatedRecord(final long expectedFormKey) {
     assertThat(RecordingExporter.formRecords().withIntent(FormIntent.CREATED).limit(2).getLast())
         .satisfies(
             record -> {
-              assertThat(record.getKey()).isEqualTo(formV2.getFormKey());
-              assertThat(record.getValue().getFormKey()).isEqualTo(formV2.getFormKey());
+              assertThat(record.getKey()).isEqualTo(expectedFormKey);
+              assertThat(record.getValue().getFormKey()).isEqualTo(expectedFormKey);
               assertThat(record.getValue().getVersion()).isEqualTo(2);
             });
   }
