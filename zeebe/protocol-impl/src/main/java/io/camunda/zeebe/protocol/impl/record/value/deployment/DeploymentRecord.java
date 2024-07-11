@@ -8,7 +8,6 @@
 package io.camunda.zeebe.protocol.impl.record.value.deployment;
 
 import static io.camunda.zeebe.util.buffer.BufferUtil.bufferAsString;
-import static java.util.function.Predicate.not;
 
 import io.camunda.zeebe.msgpack.property.ArrayProperty;
 import io.camunda.zeebe.msgpack.property.StringProperty;
@@ -180,11 +179,10 @@ public final class DeploymentRecord extends UnifiedRecordValue implements Deploy
         .anyMatch(x -> x.endsWith(".form"));
   }
 
-  // TODO name
-  public boolean hasChanged() {
-    return processesMetadata().stream().anyMatch(not(ProcessMetadata::isDuplicate))
-        || decisionRequirementsMetadata().stream()
-            .anyMatch(not(DecisionRequirementsMetadataValue::isDuplicate))
-        || formMetadata().stream().anyMatch(not(FormMetadataValue::isDuplicate));
+  public boolean hasDuplicatesOnly() {
+    return processesMetadata().stream().allMatch(ProcessMetadata::isDuplicate)
+        && decisionRequirementsMetadata().stream()
+            .allMatch(DecisionRequirementsMetadataValue::isDuplicate)
+        && formMetadata().stream().allMatch(FormMetadataValue::isDuplicate);
   }
 }

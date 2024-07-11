@@ -199,7 +199,7 @@ public final class BpmnResourceTransformer implements DeploymentResourceTransfor
       final BpmnModelInstance definition) {
     // if the deployment contains at least one non-duplicate resource, create new versions for ALL
     // resources
-    if (!deploymentEvent.hasChanged()) {
+    if (deploymentEvent.hasDuplicatesOnly()) {
       return;
     }
     for (final Process process : getExecutableProcesses(definition)) {

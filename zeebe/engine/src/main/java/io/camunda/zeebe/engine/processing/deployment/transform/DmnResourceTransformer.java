@@ -275,7 +275,7 @@ public final class DmnResourceTransformer implements DeploymentResourceTransform
       final DeploymentRecord deployment,
       final DeploymentResource resource,
       final ParsedDecisionRequirementsGraph parsedDrg) {
-    if (!deployment.hasChanged()) {
+    if (deployment.hasDuplicatesOnly()) {
       return;
     }
     deployment.decisionRequirementsMetadata().stream()

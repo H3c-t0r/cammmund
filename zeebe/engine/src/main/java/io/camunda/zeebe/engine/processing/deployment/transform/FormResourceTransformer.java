@@ -69,7 +69,7 @@ public final class FormResourceTransformer implements DeploymentResourceTransfor
   public Either<Failure, Void> transformResourceStep2(
       final DeploymentResource resource, final DeploymentRecord deployment) {
     // TODO find resource by checksum or parse form again?
-    if (!deployment.hasChanged()) {
+    if (deployment.hasDuplicatesOnly()) {
       return Either.right(null);
     }
     final var checksum = checksumGenerator.apply(resource.getResource());
