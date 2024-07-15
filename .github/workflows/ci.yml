@@ -33,7 +33,7 @@ jobs:
       identity-frontend-tests: ${{ steps.filter.outputs.identity-frontend-tests }}
       frontend-changes: ${{ steps.filter.outputs.frontend-changes }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       # Detect changes against the base branch
@@ -45,7 +45,7 @@ jobs:
     if: needs.detect-changes.outputs.actionlint == 'true'
     needs: [detect-changes]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     env:
       # renovate: datasource=github-releases depName=rhysd/actionlint
       ACTIONLINT_VERSION: '1.7.1'
@@ -69,7 +69,7 @@ jobs:
     if: needs.detect-changes.outputs.java-code-changes == 'true'
     needs: [detect-changes]
     name: Java checks
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +130,7 @@ jobs:
     if: needs.detect-changes.outputs.java-code-changes == 'true'
     needs: [detect-changes]
     runs-on: [ self-hosted, linux, amd64, "16" ]
-    timeout-minutes: 30
+    timeout-minutes: 60
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
     steps:
@@ -186,7 +186,7 @@ jobs:
     if: needs.detect-changes.outputs.java-code-changes == 'true'
     name: "[IT] ${{ matrix.name }}"
     needs: [ detect-changes ]
-    timeout-minutes: 20
+    timeout-minutes: 40
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
     runs-on: [ self-hosted, linux, amd64, "16" ]
@@ -280,7 +280,7 @@ jobs:
     name: Camunda docker tests
     needs: [ detect-changes ]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     services:
       # local registry is used as this job needs to push as it builds multi-platform images
       registry:
@@ -338,6 +338,17 @@ jobs:
           dockerfile: camunda.Dockerfile
           # push is needed for multi-arch images as buildkit does not support loading them locally
           push: true
+
+      # We need to free up some space to let the step after this block succeed.
+      # With this cleanup, at the time of measuring, we go from a 100% disk usage (73/74 GB) to a
+      # 94% (68/73 GB), on the runner ubuntu-latest. This allows the workflow to go through.
+      - name: Check disk availability (pre-cleanup)
+        run: df -h
+      - name: Cleanup docker images
+        run: docker system prune -af
+      - name: Check disk availability (post-cleanup)
+        run: df -h
+
       - name: Verify Docker image
         uses: ./.github/actions/verify-platform-docker
         with:
@@ -368,7 +379,7 @@ jobs:
     if: needs.detect-changes.outputs.identity-frontend-tests == 'true'
     needs: [detect-changes]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: identity/client

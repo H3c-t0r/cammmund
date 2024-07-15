@@ -53,4 +53,8 @@ hs_err*.log
 .vscode
 .eslintcache
 els-snapshots
+
+optimize/client/.vscode/
+optimize/client/dist
+optimize/client/.node/
 .yarn
